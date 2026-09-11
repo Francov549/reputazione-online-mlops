@@ -1,0 +1,9 @@
+{
+  "reference_shares": [
+    0.1983333333,
+    0.4333333333,
+    0.3683333333
+  ],
+  "reference_f1": 0.7855671018,
+  "model_revision": "3216a57f2a0d9c45a2e6c20157c20c49fb4bf9c7"
+}
