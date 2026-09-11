@@ -1,0 +1,63 @@
+{
+  "seed": 42,
+  "model": "cardiffnlp/twitter-roberta-base-sentiment-latest",
+  "model_revision": "3216a57f2a0d9c45a2e6c20157c20c49fb4bf9c7",
+  "dataset": {
+    "id": "cardiffnlp/tweet_eval",
+    "revision": "b3a375baf0f409c77e6bc7aa35102b7b3534f8be",
+    "samples": {
+      "train": 1200,
+      "validation": 600,
+      "test": 1200
+    }
+  },
+  "training": {
+    "method": "frozen_roberta_train_classifier",
+    "epochs": 2,
+    "learning_rate": 0.0001
+  },
+  "validation_base": {
+    "accuracy": 0.7916666667,
+    "macro_f1": 0.7855671018,
+    "negative_recall": 0.8602150538
+  },
+  "validation_candidate": {
+    "accuracy": 0.7816666667,
+    "macro_f1": 0.7739741632,
+    "negative_recall": 0.8172043011
+  },
+  "candidate_promoted": false,
+  "selected_model": "baseline",
+  "test": {
+    "n": 1200,
+    "accuracy": 0.7375,
+    "macro_f1": 0.7367860089,
+    "negative_recall": 0.8195876289,
+    "confusion_matrix": [
+      [
+        318,
+        65,
+        5
+      ],
+      [
+        122,
+        399,
+        59
+      ],
+      [
+        8,
+        56,
+        168
+      ]
+    ]
+  },
+  "test_macro_f1_bootstrap95": [
+    0.7097673051,
+    0.7648221998
+  ],
+  "majority_test": {
+    "accuracy": 0.4833333333,
+    "macro_f1": 0.2172284644
+  },
+  "device": "cuda"
+}
