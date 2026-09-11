@@ -1,0 +1,100 @@
+name: Test, monitoraggio e retraining
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: Esegui esperimento didattico di training
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: reputation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements.txt
+      - run: python -m compileall -q reputation.py monitor_batch.py app.py deploy.py
+      - run: python -m pytest test_pipeline.py -q
+      - name: Test integrazione modello reale e salvataggio
+        env:
+          RUN_MODEL_TESTS: '1'
+        run: python -m pytest test_pipeline.py -q -k real_model
+      - name: Controllo costruzione applicazione
+        run: python -c "from app import build_app; assert build_app() is not None"
+  monitoring:
+    needs: checks
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      retrain: ${{ steps.monitor.outputs.retrain }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements.txt
+      - id: monitor
+        env:
+          CHAMPION_MODEL_ID: ${{ vars.CHAMPION_MODEL_ID }}
+        run: python monitor_batch.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-${{ github.run_id }}
+          path: artifacts/monitor_status.json
+          retention-days: 30
+  training:
+    needs: monitoring
+    if: needs.monitoring.outputs.retrain == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run_training)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements.txt
+      - name: Training e selezione del modello
+        env:
+          RETRAIN: ${{ needs.monitoring.outputs.retrain }}
+          CHAMPION_MODEL_ID: ${{ vars.CHAMPION_MODEL_ID }}
+        run: |
+          if [ "$RETRAIN" = "true" ]; then
+            python reputation.py --feedback data/feedback.jsonl
+          else
+            python reputation.py
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experiment-${{ github.run_id }}
+          path: |
+            artifacts/report.json
+            artifacts/environment.json
+            artifacts/test_predictions.json
+          retention-days: 30
+      - name: Deploy facoltativo su Hugging Face
+        if: vars.ENABLE_HF_DEPLOY == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_MODEL_ID: ${{ vars.HF_MODEL_ID }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: python deploy.py
